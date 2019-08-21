@@ -1,0 +1,58 @@
+function db2_table_copy_load
+{
+
+TABSCHEMA=$1
+TBNM=$2
+SDB=$3
+TDB=$4
+SUSR=$5
+SPW=$6
+
+if [[ $# -ne 6 ]];then 
+
+ echo "Usage: ksh $0  " 
+ echo "TABSCHEMA=\$1"
+ echo "TBNM=\$2"
+ echo "SDB=\$3"
+ echo "TDB=\$4"
+ echo "SUSR=\$5"
+ echo "SPW=\$6"
+ exit 1 
+
+fi 
+
+
+db2 -v "connect to $TDB ";
+
+db2 -v "declare cur cursor  database $SDB  user $SUSR  using $SPW  for select * from ${TABSCHEMA}.${TBNM} with ur";
+
+
+GENTYP=$(db2 -x "select substr(GENERATED,1) from syscat.columns where TABSCHEMA='${TABSCHEMA}' AND TABNAME='${TBNM}' AND  GENERATED ='A' with ur")
+
+if [[ "$GENTYP" = "A" ]]
+then
+
+     IDENTITY=`db2 -x "select substr(IDENTITY,1) from syscat.columns where TABSCHEMA='${TABSCHEMA}' AND TABNAME='${TBNM}' AND  IDENTITY ='Y' with ur"`
+     ROWTS=`db2 -x "select substr(ROWCHANGETIMESTAMP,1) from syscat.columns where TABSCHEMA='${TABSCHEMA}' AND TABNAME='${TBNM}' AND  ROWCHANGETIMESTAMP ='Y' with ur"`
+    
+   if [[ "$IDENTITY" = "Y" ]]
+     then
+
+	       echo " db2 "load from cur of cursor  modified by identityoverride  messages ${TABSCHEMA}.${TBNM}.msg REPLACE into ${TABSCHEMA}.${TBNM} nonrecoverable";"
+
+   elif [[ "$ROWTS" = "Y" ]]
+     then
+		echo "	db2 "load from cur of cursor  modified by rowchangetimestampoverride   messages ${TABSCHEMA}.${TBNM}.msg REPLACE into ${TABSCHEMA}.${TBNM} nonrecoverable";"
+	 
+   else 
+     		echo "    db2 "load from cur of cursor  modified by generatedoverride   messages ${TABSCHEMA}.${TBNM}.msg REPLACE into ${TABSCHEMA}.${TBNM} nonrecoverable";"
+
+   fi
+
+else 
+	     	echo "    db2 "load from cur of cursor    messages ${TABSCHEMA}.${TBNM}.msg REPLACE into ${TABSCHEMA}.${TBNM} nonrecoverable";"
+
+fi
+
+exit 0
+}
